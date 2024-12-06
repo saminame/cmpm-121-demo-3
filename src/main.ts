@@ -101,7 +101,7 @@ class Player {
 
 const player = new Player({ lat: INITIAL_LAT, lng: INITIAL_LNG });
 let cacheLocations: Geocache[] = [];
-const cacheState: Map<string, string> = new Map(); // Map to store serialized cache states
+const cacheState: Map<string, string> = new Map();
 
 const map = L.map("map").setView([INITIAL_LAT, INITIAL_LNG], 16);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -143,49 +143,49 @@ function restoreCache(cacheId: string): Geocache | null {
 }
 
 function updateVisibleCaches() {
-    const visibleCacheIds = new Set<string>();
-    cacheLocations = [];
-    const playerCell = latLngToCell(player.position);
-  
-    // Loop through cells within RANGE of the player's current cell
-    for (let i = -RANGE; i <= RANGE; i++) {
-      for (let j = -RANGE; j <= RANGE; j++) {
-        const cell: Cell = { i: playerCell.i + i, j: playerCell.j + j };
-        const cacheId = `cache_${cell.i}_${cell.j}`;
-        visibleCacheIds.add(cacheId);
-  
-        // Restore or generate cache
-        if (cacheState.has(cacheId)) {
-          const restoredCache = restoreCache(cacheId);
-          if (restoredCache) cacheLocations.push(restoredCache);
-        } else {
-          const newCache = generateCache(cell);
-          if (newCache) cacheLocations.push(newCache);
-        }
+  const visibleCacheIds = new Set<string>();
+  cacheLocations = [];
+  const playerCell = latLngToCell(player.position);
+
+  for (let i = -RANGE; i <= RANGE; i++) {
+    for (let j = -RANGE; j <= RANGE; j++) {
+      const cell: Cell = { i: playerCell.i + i, j: playerCell.j + j };
+      const cacheId = `cache_${cell.i}_${cell.j}`;
+      visibleCacheIds.add(cacheId);
+
+      if (cacheState.has(cacheId)) {
+        const restoredCache = restoreCache(cacheId);
+        if (restoredCache) cacheLocations.push(restoredCache);
+      } else {
+        const newCache = generateCache(cell);
+        if (newCache) cacheLocations.push(newCache);
       }
     }
-  
-    // Remove markers for caches that are out of range
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Marker) {
-        const markerId = (layer as any).options.cacheId;
-        if (markerId && !visibleCacheIds.has(markerId)) {
-          map.removeLayer(layer);
-        }
-      }
-    });
-  
-    updateCacheMarkers(); // Add or update markers for visible caches
   }
-  
- function updateCacheMarkers() {
+
+  map.eachLayer((layer: L.Layer) => {
+    if (layer instanceof L.Marker) {
+      const markerId = (layer.options as { cacheId?: string }).cacheId;
+
+      if (markerId && !visibleCacheIds.has(markerId)) {
+        map.removeLayer(layer);
+      }
+    }
+  });
+
+  updateCacheMarkers();
+}
+
+function updateCacheMarkers() {
   cacheLocations.forEach((cache) => {
     const marker = L.marker([cache.location.lat, cache.location.lng], {
-      cacheId: cache.id, 
+      cacheId: cache.id,
     }).addTo(map);
 
     const getPopupContent = () => `
-      <b>Cache at (${cache.location.lat.toFixed(5)}, ${cache.location.lng.toFixed(5)})</b><br>
+      <b>Cache at (${cache.location.lat.toFixed(5)}, ${
+      cache.location.lng.toFixed(5)
+    })</b><br>
       Coins: ${cache.coins.map((coin) => coin.id).join(", ") || "(empty)"}<br>
       <div>
         <button id="collect-btn-${cache.id}" class="popup-btn">Collect Coins</button>
@@ -203,7 +203,6 @@ function updateVisibleCaches() {
         collectBtn.addEventListener("click", () => {
           collectCoins(cache.id);
 
-          // Update the popup content dynamically
           const popup = marker.getPopup();
           if (popup) {
             popup.setContent(getPopupContent());
@@ -215,7 +214,6 @@ function updateVisibleCaches() {
         depositBtn.addEventListener("click", () => {
           depositCoins(cache.id);
 
-          // Update the popup content dynamically
           const popup = marker.getPopup();
           if (popup) {
             popup.setContent(getPopupContent());
@@ -225,60 +223,46 @@ function updateVisibleCaches() {
     });
   });
 }
-   
 
-  function collectCoins(cacheId: string) {
-    const cache = cacheLocations.find((c) => c.id === cacheId);
-  
-    if (!cache) {
-      alert("Cache not found!");
-      return;
-    }
-  
-    if (cache.coins.length === 0) {
-      alert("This cache is empty! You cannot collect any more coins.");
-      return;
-    }
-  
-    const coin = cache.coins.pop()!;
-    player.collectCoin(coin, cacheId);
-    cacheState.set(cache.id, cache.toMomento()); // Save updated cache state
-  
-    alert(`Collected coin: ${coin.id}`);
-    renderPlayerInventory(); // Update player's inventory display
-  }
-   
+function collectCoins(cacheId: string) {
   const cache = cacheLocations.find((c) => c.id === cacheId);
-  if (cache && cache.coins.length > 0) {
-    const coin = cache.coins.pop()!;
-    player.collectCoin(coin, cacheId);
-    cacheState.set(cache.id, cache.toMomento()); // Save updated state
-    alert(`Collected coin: ${coin.id}`);
-    renderPlayerInventory();
-    updateCacheMarkers();
+  if (!cache) {
+    alert("Cache not found!");
+    return;
   }
 
-
-  function depositCoins(cacheId: string) {
-    const cache = cacheLocations.find((c) => c.id === cacheId);
-  
-    if (!cache) {
-      alert("Cache not found!");
-      return;
-    }
-  
-    if (player.coins.length === 0) {
-      alert("You have no coins to deposit!");
-      return;
-    }
-  
-    player.depositCoin(cache);
-    cacheState.set(cache.id, cache.toMomento()); // Save updated cache state
-  
-    alert(`Deposited a coin into cache ${cacheId}`);
-    renderPlayerInventory(); // Update player's inventory display
+  if (cache.coins.length === 0) {
+    alert("This cache is empty!");
+    return;
   }
-  
+
+  const coin = cache.coins.pop()!;
+  player.collectCoin(coin, cache.id);
+  cacheState.set(cache.id, cache.toMomento());
+
+  renderPlayerInventory();
+  updateCacheMarkers();
+}
+
+function depositCoins(cacheId: string) {
+  const cache = cacheLocations.find((c) => c.id === cacheId);
+  if (!cache) {
+    alert("Cache not found!");
+    return;
+  }
+
+  if (player.coins.length === 0) {
+    alert("You have no coins to deposit!");
+    return;
+  }
+
+  player.depositCoin(cache);
+  cacheState.set(cache.id, cache.toMomento());
+
+  renderPlayerInventory();
+  updateCacheMarkers();
+}
+
 function renderPlayerInventory() {
   const inventoryDiv = document.getElementById("inventory");
   inventoryDiv!.innerHTML = `Inventory: ${
@@ -289,53 +273,50 @@ function renderPlayerInventory() {
 }
 
 function renderButtons() {
-    const uiContainer = document.getElementById("ui-container");
-  
-    const buttonContainer = document.createElement("div");
-    buttonContainer.id = "button-container";
-    buttonContainer.style.display = "flex";
-    buttonContainer.style.justifyContent = "center";
-    buttonContainer.style.margin = "10px 0";
-  
-    ["⬆️", "⬇️", "⬅️", "➡️"].forEach((buttonText, index) => {
-      const btn = document.createElement("button");
-      btn.textContent = buttonText;
-      btn.style.margin = "5px";
-      btn.style.padding = "10px";
-      btn.style.fontSize = "20px";
-  
-      btn.addEventListener("click", () => {
-        const directions = ["north", "south", "west", "east"];
-        player.move(directions[index]); // Move the player
-        map.setView([player.position.lat, player.position.lng]); // Update map view
-        playerMarker.setLatLng([player.position.lat, player.position.lng]); // Update player marker
-        updateVisibleCaches(); // Regenerate caches
-        renderPlayerInventory(); // Update inventory
-      });
-  
-      buttonContainer.appendChild(btn);
-    });
-  
-    uiContainer?.appendChild(buttonContainer); 
-  }
-      
+  const uiContainer = document.getElementById("ui-container");
 
-// Initialize UI
-document.addEventListener("DOMContentLoaded", () => {
-    const uiContainer = document.createElement("div");
-    uiContainer.id = "ui-container";
-    uiContainer.style.display = "flex";
-    uiContainer.style.flexDirection = "column";
-    uiContainer.style.alignItems = "center";
-    document.body.appendChild(uiContainer);
-  
-    const inventoryDiv = document.createElement("div");
-    inventoryDiv.id = "inventory";
-    inventoryDiv.style.marginTop = "10px";
-    uiContainer.appendChild(inventoryDiv);
-  
-    renderButtons(); // Render movement buttons
-    renderPlayerInventory(); // Render inventory display
-    updateVisibleCaches(); // Initialize visible caches
+  const buttonContainer = document.createElement("div");
+  buttonContainer.id = "button-container";
+  buttonContainer.style.display = "flex";
+  buttonContainer.style.justifyContent = "center";
+  buttonContainer.style.margin = "10px 0";
+
+  ["⬆️", "⬇️", "⬅️", "➡️"].forEach((buttonText, index) => {
+    const btn = document.createElement("button");
+    btn.textContent = buttonText;
+    btn.style.margin = "5px";
+    btn.style.padding = "10px";
+    btn.style.fontSize = "20px";
+
+    btn.addEventListener("click", () => {
+      const directions = ["north", "south", "west", "east"];
+      player.move(directions[index]);
+      map.setView([player.position.lat, player.position.lng]);
+      playerMarker.setLatLng([player.position.lat, player.position.lng]);
+      updateVisibleCaches();
+      renderPlayerInventory();
+    });
+
+    buttonContainer.appendChild(btn);
   });
-  
+
+  uiContainer?.appendChild(buttonContainer);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const uiContainer = document.createElement("div");
+  uiContainer.id = "ui-container";
+  uiContainer.style.display = "flex";
+  uiContainer.style.flexDirection = "column";
+  uiContainer.style.alignItems = "center";
+  document.body.appendChild(uiContainer);
+
+  const inventoryDiv = document.createElement("div");
+  inventoryDiv.id = "inventory";
+  inventoryDiv.style.marginTop = "10px";
+  uiContainer.appendChild(inventoryDiv);
+
+  renderButtons();
+  renderPlayerInventory();
+  updateVisibleCaches();
+});
