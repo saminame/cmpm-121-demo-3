@@ -14,7 +14,10 @@ This is a geocaching game built with TypeScript and Leaflet. The player can coll
 - The player’s inventory updates as coins are collected or deposited.
 
 ### D3.c
--
+- The player can move their location on the map using ⬆️⬇️⬅️➡️ buttons.
+- The map view and nearby caches are updated dynamically as the player moves.
+- The Memento pattern is used to save and restore the state of caches, ensuring that their contents remain consistent even when moving in and out of range.
+- Player movement is aligned with the grid system (0.0001 degrees per step), and cache visibility is limited to nearby locations.
 
 ### D3.d
 -
