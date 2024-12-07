@@ -267,7 +267,9 @@ function renderPlayerInventory() {
   const inventoryDiv = document.getElementById("inventory");
   inventoryDiv!.innerHTML = `Inventory: ${
     player.coins.length > 0
-      ? player.coins.map((coin) => coin.id).join(", ")
+      ? player.coins.map((coin) =>
+        `<span class="coin-link" onclick="centerMapOnCoin('${coin.id}')">${coin.id}</span>`
+      ).join(", ")
       : "(empty)"
   }`;
 }
@@ -295,12 +297,125 @@ function renderButtons() {
       playerMarker.setLatLng([player.position.lat, player.position.lng]);
       updateVisibleCaches();
       renderPlayerInventory();
+      saveGameState(); // Save the game state
     });
 
     buttonContainer.appendChild(btn);
   });
 
   uiContainer?.appendChild(buttonContainer);
+}
+
+function enableGeolocationTracking() {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+
+  navigator.geolocation.watchPosition(
+    (position) => {
+      player.position.lat = position.coords.latitude;
+      player.position.lng = position.coords.longitude;
+      map.setView([player.position.lat, player.position.lng]);
+      playerMarker.setLatLng([player.position.lat, player.position.lng]);
+      updateVisibleCaches();
+      renderPlayerInventory();
+    },
+    (error) => {
+      alert(`Geolocation error: ${error.message}`);
+    },
+  );
+}
+
+function renderGeolocationButton() {
+  const button = document.createElement("button");
+  button.textContent = "🌐";
+  button.style.margin = "5px";
+  button.style.padding = "10px";
+  button.style.fontSize = "20px";
+
+  button.addEventListener("click", enableGeolocationTracking);
+
+  document.getElementById("ui-container")?.appendChild(button);
+}
+
+function saveGameState() {
+  const state = {
+    player: player.position,
+    inventory: player.coins,
+    caches: Array.from(cacheState.entries()),
+    history: movementHistory,
+  };
+  localStorage.setItem("gameState", JSON.stringify(state));
+}
+
+function restoreGameState() {
+  const state = localStorage.getItem("gameState");
+  if (state) {
+    const { player: savedPlayer, inventory, caches, history } = JSON.parse(
+      state,
+    );
+    player.position = savedPlayer;
+    player.coins = inventory;
+    movementHistory = history || [];
+    cacheState.clear();
+    caches.forEach(([id, momento]: [string, string]) => {
+      const cache = new Geocache("", { lat: 0, lng: 0 });
+      cache.fromMomento(momento);
+      cacheState.set(id, cache.toMomento());
+    });
+    updateVisibleCaches();
+    renderPlayerInventory();
+    updateMovementHistory();
+  }
+}
+
+let movementHistory: Coordinates[] = [];
+let polyline: L.Polyline | null = null;
+
+function updateMovementHistory() {
+  movementHistory.push({ ...player.position });
+
+  if (polyline) {
+    map.removeLayer(polyline);
+  }
+
+  polyline = L.polyline(movementHistory, { color: "blue" }).addTo(map);
+}
+
+function resetGameState() {
+  if (
+    confirm(
+      "Are you sure you want to reset the game state? This will erase your inventory, location history, and caches.",
+    )
+  ) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+function renderResetButton() {
+  const button = document.createElement("button");
+  button.textContent = "🚮";
+  button.style.margin = "5px";
+  button.style.padding = "10px";
+  button.style.fontSize = "20px";
+
+  button.addEventListener("click", resetGameState);
+
+  document.getElementById("ui-container")?.appendChild(button);
+}
+
+function _centerMapOnCoin(coinId: string) {
+  const [i, j] = coinId.split("#")[0].split(":").map(Number);
+  const cacheId = `cache_${i}_${j}`;
+  const cache = cacheLocations.find((c) => c.id === cacheId);
+
+  if (cache) {
+    map.setView([cache.location.lat, cache.location.lng], 16);
+  } else {
+    alert("Cache not found for this coin.");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -316,7 +431,11 @@ document.addEventListener("DOMContentLoaded", () => {
   inventoryDiv.style.marginTop = "10px";
   uiContainer.appendChild(inventoryDiv);
 
-  renderButtons();
-  renderPlayerInventory();
-  updateVisibleCaches();
+  renderButtons(); // Movement buttons
+  renderGeolocationButton(); // Geolocation button
+  renderResetButton(); // Reset button
+  renderPlayerInventory(); // Inventory display
+
+  restoreGameState(); // Restore the game state
+  updateVisibleCaches(); // Initialize visible caches
 });
