@@ -20,4 +20,14 @@ This is a geocaching game built with TypeScript and Leaflet. The player can coll
 - Player movement is aligned with the grid system (0.0001 degrees per step), and cache visibility is limited to nearby locations.
 
 ### D3.d
--
+- The player can use the 🌐 button to enable automatic movement tracking with their device's location.
+- The game saves progress, so the player can continue where they left off after closing the browser.
+- A blue line on the map shows the player's movement history.
+- The 🚮 button resets the game, clearing inventory, movement history, and caches, with a confirmation prompt.
+- Clicking on a coin in the inventory centers the map on its home cache.
+
+
+
+
+
+
